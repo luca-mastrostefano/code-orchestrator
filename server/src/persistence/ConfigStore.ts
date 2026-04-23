@@ -7,6 +7,7 @@ const DEFAULT_CONFIG: AppConfig = {
   customAgents: [],
   agentFlags: {},
   notificationsEnabled: false,
+  soundEnabled: true,
 };
 
 export class ConfigStore {

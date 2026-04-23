@@ -11,6 +11,7 @@ import type {
 } from '@remote-orchestrator/shared';
 import { PtyManager } from './PtyManager.js';
 import { StateDetector } from './StateDetector.js';
+import { pickScientistName } from './scientists.js';
 import { SessionStore, type PersistedSession } from '../persistence/SessionStore.js';
 import { ConfigStore } from '../persistence/ConfigStore.js';
 import { AgentRegistry } from './AgentRegistry.js';
@@ -87,7 +88,10 @@ export class SessionManager {
     const command = agentDef?.command ?? resolvedAgentType;
 
     const id = existingId ?? uuidv4();
-    const sessionName = name || path.basename(folderPath);
+    // When the user doesn't pick a name, sample one from a list of famous
+    // scientists. Restores preserve the original name via existingCreatedAt/id;
+    // only fresh sessions roll a random scientist.
+    const sessionName = name || pickScientistName();
     const createdAt = existingCreatedAt ?? new Date().toISOString();
 
     const stateDetector = new StateDetector((status) => {
@@ -235,6 +239,19 @@ export class SessionManager {
     if (session.status === 'exited') return;
     this.ptyManager.resize(session.pty, cols, rows);
     session.stateDetector.resize(cols, rows);
+  }
+
+  async renameSession(id: string, name: string): Promise<SessionInfo> {
+    const session = this.sessions.get(id);
+    if (!session) throw new Error(`Session ${id} not found`);
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('Name cannot be empty');
+    if (trimmed.length > 100) throw new Error('Name is too long');
+    session.name = trimmed;
+    await this.persistSessions();
+    const info = this.toSessionInfo(session);
+    this.io?.emit('session:renamed', { sessionId: id, name: trimmed });
+    return info;
   }
 
   async restoreSessions(): Promise<void> {

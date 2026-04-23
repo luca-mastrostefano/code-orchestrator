@@ -55,12 +55,19 @@ export function useSessions(socket: TypedSocket) {
       );
     };
 
+    const handleRenamed = ({ sessionId, name }: { sessionId: string; name: string }) => {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, name } : s)),
+      );
+    };
+
     socket.on('session:status', handleStatus);
     socket.on('session:exit', handleExit);
     socket.on('session:created', handleCreated);
     socket.on('session:deleted', handleDeleted);
     socket.on('session:error', handleSessionError);
     socket.on('session:gitStatus', handleGitStatus);
+    socket.on('session:renamed', handleRenamed);
 
     return () => {
       socket.off('session:status', handleStatus);
@@ -69,6 +76,7 @@ export function useSessions(socket: TypedSocket) {
       socket.off('session:deleted', handleDeleted);
       socket.off('session:error', handleSessionError);
       socket.off('session:gitStatus', handleGitStatus);
+      socket.off('session:renamed', handleRenamed);
     };
   }, [socket]);
 

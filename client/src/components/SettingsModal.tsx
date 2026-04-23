@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { AgentDefinition, AgentFlag, AgentStatus, AppConfig } from '@remote-orchestrator/shared';
 import { X } from 'lucide-react';
 import { api } from '../services/api.js';
+import { playDoneChime } from '../utils/sound.js';
 import { Modal } from './primitives/index.js';
 import { Button } from './primitives/index.js';
 import { Skeleton } from './primitives/index.js';
@@ -39,6 +40,7 @@ export function SettingsModal({ config, onClose, onSave, version }: SettingsModa
   const [needsPermission, setNeedsPermission] = useState(
     (config.notificationsEnabled ?? false) && browserSupportsNotifications && !permissionAlreadyGranted && Notification.permission !== 'denied',
   );
+  const [soundEnabled, setSoundEnabled] = useState(config.soundEnabled ?? true);
 
   useEffect(() => {
     api.detectAgents()
@@ -117,7 +119,7 @@ export function SettingsModal({ config, onClose, onSave, version }: SettingsModa
     setSaving(true);
     setError('');
     try {
-      await onSave({ defaultAgent, customAgents, agentFlags, notificationsEnabled });
+      await onSave({ defaultAgent, customAgents, agentFlags, notificationsEnabled, soundEnabled });
       onClose();
     } catch {
       setError('Failed to save settings.');
@@ -394,9 +396,11 @@ export function SettingsModal({ config, onClose, onSave, version }: SettingsModa
       </section>
 
       {/* Session Notifications */}
-      {'Notification' in window && (
-        <section style={{ marginBottom: 'var(--space-6)' }}>
-          <label style={sectionLabel}>Session Notifications</label>
+      <section style={{ marginBottom: 'var(--space-6)' }}>
+        <label style={sectionLabel}>Session Notifications</label>
+
+        {'Notification' in window && (
+        <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <button
               role="switch"
@@ -427,7 +431,7 @@ export function SettingsModal({ config, onClose, onSave, version }: SettingsModa
               }} />
             </button>
             <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-secondary)' }}>
-              Notify when a session is waiting for input
+              Desktop notification when a session needs input or becomes idle
             </span>
           </div>
           {needsPermission && (
@@ -463,8 +467,63 @@ export function SettingsModal({ config, onClose, onSave, version }: SettingsModa
               Notification permission was denied. Enable it in your browser settings.
             </div>
           )}
-        </section>
-      )}
+        </>
+        )}
+
+        {/* Sound toggle — independent from desktop notifications */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+          <button
+            role="switch"
+            aria-checked={soundEnabled}
+            onClick={() => setSoundEnabled((v) => !v)}
+            style={{
+              width: 44,
+              height: 24,
+              borderRadius: 12,
+              border: 'none',
+              background: soundEnabled ? 'var(--color-accent)' : 'var(--color-border-subtle)',
+              position: 'relative',
+              cursor: 'pointer',
+              transition: 'background var(--transition-fast)',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{
+              position: 'absolute',
+              top: 2,
+              left: soundEnabled ? 22 : 2,
+              width: 20,
+              height: 20,
+              borderRadius: '50%',
+              background: '#fff',
+              transition: 'left var(--transition-fast)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+            }} />
+          </button>
+          <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-secondary)' }}>
+            Play a chime when a session becomes idle
+          </span>
+          <button
+            type="button"
+            onClick={() => playDoneChime()}
+            disabled={!soundEnabled}
+            style={{
+              marginLeft: 'auto',
+              fontSize: 'var(--text-sm)',
+              padding: '2px 10px',
+              border: '1px solid var(--color-border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              background: 'transparent',
+              color: soundEnabled ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
+              cursor: soundEnabled ? 'pointer' : 'not-allowed',
+              opacity: soundEnabled ? 1 : 0.5,
+              transition: 'background var(--transition-fast)',
+            }}
+          >
+            Preview
+          </button>
+        </div>
+      </section>
 
       {version && (
         <div style={{

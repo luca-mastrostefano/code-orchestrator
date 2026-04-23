@@ -312,7 +312,7 @@ export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Defaults to folder name"
+              placeholder="Defaults to a famous scientist"
               style={inputStyle}
             />
           </div>

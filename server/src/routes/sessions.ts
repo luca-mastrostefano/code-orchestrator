@@ -84,6 +84,21 @@ export function createSessionRoutes(manager: SessionManager, orderStore: OrderSt
     }
   });
 
+  router.patch('/:id', async (req, res) => {
+    const { name } = req.body as { name?: string };
+    if (typeof name !== 'string') {
+      res.status(400).json({ error: 'name is required' });
+      return;
+    }
+    try {
+      const session = await manager.renameSession(req.params.id, name);
+      res.json(session);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to rename session';
+      res.status(400).json({ error: message });
+    }
+  });
+
   router.patch('/:id/restart', async (req, res) => {
     try {
       const session = await manager.restartSession(req.params.id);

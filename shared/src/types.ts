@@ -23,6 +23,8 @@ export interface AppConfig {
   customAgents: AgentDefinition[];
   agentFlags: Record<string, AgentFlag[]>;  // keyed by agent ID
   notificationsEnabled: boolean;
+  /** Play a chime when a session transitions to idle (and is not the focused one). */
+  soundEnabled: boolean;
 }
 
 export interface AgentStatus {
@@ -85,6 +87,7 @@ export interface ServerToClientEvents {
   'update:applying': () => void;
   'session:error': (payload: { sessionId: string; message: string }) => void;
   'session:gitStatus': (payload: { sessionId: string; hasGitChanges: boolean }) => void;
+  'session:renamed': (payload: { sessionId: string; name: string }) => void;
   // Ephemeral terminal responses
   'ephemeral:output': (payload: { id: string; data: string }) => void;
   'ephemeral:exit': (payload: { id: string; exitCode: number }) => void;

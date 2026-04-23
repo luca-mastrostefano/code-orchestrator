@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, GitBranch, FolderOpen, X } from 'lucide-react';
+import { Plus, GitCompare, FolderOpen, X } from 'lucide-react';
 import { TerminalPanel } from './TerminalPanel.js';
 import { SessionGroup } from './SessionGroup.js';
 import { GitDiffPanel } from './GitDiffPanel.js';
@@ -409,7 +409,7 @@ export function Dashboard({
               }}
               aria-label="Toggle diff view"
             >
-              <GitBranch size={13} strokeWidth={1.75} />
+              <GitCompare size={13} strokeWidth={1.75} />
             </button>
             <button
               onClick={() => onToggleExplorer(focusedSession.id)}
@@ -444,6 +444,7 @@ export function Dashboard({
               onSelectSession={handleSwitchFocus}
               width={sidebarWidth}
               unreadSessions={unreadSessions}
+              onOpenDiff={onToggleDiff}
               headerAction={
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   {sidebarSettingsMenu}
@@ -613,6 +614,7 @@ export function Dashboard({
         <CollapsedChipRow
           sessions={collapsedSessions}
           onUncollapse={(id) => { uncollapse(id); triggerRefit(); }}
+          onOpenDiff={onToggleDiff}
         />
       )}
 

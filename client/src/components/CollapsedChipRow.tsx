@@ -4,9 +4,10 @@ import { CollapsedSessionChip } from './CollapsedSessionChip.js';
 interface CollapsedChipRowProps {
   sessions: SessionInfo[];
   onUncollapse: (id: string) => void;
+  onOpenDiff?: (id: string) => void;
 }
 
-export function CollapsedChipRow({ sessions, onUncollapse }: CollapsedChipRowProps) {
+export function CollapsedChipRow({ sessions, onUncollapse, onOpenDiff }: CollapsedChipRowProps) {
   if (sessions.length === 0) return null;
 
   return (
@@ -40,6 +41,7 @@ export function CollapsedChipRow({ sessions, onUncollapse }: CollapsedChipRowPro
           key={session.id}
           session={session}
           onUncollapse={onUncollapse}
+          onOpenDiff={onOpenDiff}
         />
       ))}
     </div>

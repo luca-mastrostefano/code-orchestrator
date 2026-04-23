@@ -1,16 +1,24 @@
 import { useEffect, useRef } from 'react';
 import type { SessionInfo } from '@remote-orchestrator/shared';
+import { playDoneChime } from '../utils/sound.js';
 
 interface UseNotificationsOptions {
   sessions: SessionInfo[];
-  enabled: boolean;
+  /** Whether to show desktop notifications. */
+  notificationsEnabled: boolean;
+  /** Whether to play a chime when a session becomes idle. */
+  soundEnabled: boolean;
+  /** Currently-focused session id in the UI (not the OS window focus). */
+  focusedSessionId: string | null;
   onFocusSession: (id: string) => void;
   onSwitchToSessionsTab: () => void;
 }
 
 export function useNotifications({
   sessions,
-  enabled,
+  notificationsEnabled,
+  soundEnabled,
+  focusedSessionId,
   onFocusSession,
   onSwitchToSessionsTab,
 }: UseNotificationsOptions) {
@@ -24,12 +32,11 @@ export function useNotifications({
     onSwitchRef.current = onSwitchToSessionsTab;
   }, [onFocusSession, onSwitchToSessionsTab]);
 
-  const fireNotification = (session: SessionInfo) => {
+  const fireNotification = (session: SessionInfo, title: string, body: string) => {
     if (activeNotifs.current.has(session.id)) return;
 
-    const folderName = session.folderPath.split('/').pop() || session.folderPath;
-    const notif = new Notification(session.name, {
-      body: folderName,
+    const notif = new Notification(title, {
+      body,
       tag: `session-${session.id}`,
     });
 
@@ -44,28 +51,39 @@ export function useNotifications({
     activeNotifs.current.set(session.id, notif);
   };
 
-  // Fire notifications on status transitions
+  // Fire notifications / chime on status transitions. Sound and desktop
+  // notifications are independent toggles — either, both, or neither may fire
+  // depending on config and current focus state.
   useEffect(() => {
-    if (!enabled || !('Notification' in window) || Notification.permission !== 'granted') {
-      for (const session of sessions) {
-        prevStatuses.current.set(session.id, session.status);
-      }
-      return;
-    }
+    const canNotify =
+      notificationsEnabled && 'Notification' in window && Notification.permission === 'granted';
 
     for (const session of sessions) {
       const prev = prevStatuses.current.get(session.id);
       const curr = session.status;
+      const folderName = session.folderPath.split('/').pop() || session.folderPath;
 
-      // Transition TO waiting — only notify if tab is not focused
+      // Transition TO waiting (needs input) — desktop notification only, tab unfocused.
       if (curr === 'waiting' && prev !== 'waiting' && prev !== undefined) {
-        if (!document.hasFocus()) {
-          fireNotification(session);
+        if (canNotify && !document.hasFocus()) {
+          fireNotification(session, session.name, `Needs input — ${folderName}`);
         }
       }
 
-      // Transition AWAY from waiting — clean up
-      if (curr !== 'waiting' && prev === 'waiting') {
+      // Transition TO idle (done running):
+      //  - chime: unless the user is already focused on this session in the UI;
+      //  - notification: only when the whole tab is unfocused.
+      if (curr === 'idle' && prev !== 'idle' && prev !== undefined && prev !== 'exited') {
+        if (soundEnabled && focusedSessionId !== session.id) {
+          playDoneChime();
+        }
+        if (canNotify && !document.hasFocus()) {
+          fireNotification(session, session.name, `Idle — ${folderName}`);
+        }
+      }
+
+      // Transition AWAY from waiting/idle — clean up any lingering notification
+      if (curr !== 'waiting' && curr !== 'idle' && (prev === 'waiting' || prev === 'idle')) {
         const existing = activeNotifs.current.get(session.id);
         if (existing) {
           existing.close();
@@ -85,7 +103,7 @@ export function useNotifications({
         prevStatuses.current.delete(id);
       }
     }
-  }, [sessions, enabled]);
+  }, [sessions, notificationsEnabled, soundEnabled, focusedSessionId]);
 
   // Cleanup on unmount
   useEffect(() => {

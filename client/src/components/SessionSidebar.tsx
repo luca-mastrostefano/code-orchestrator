@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, type ReactNode } from 'react';
 import type { SessionInfo, SessionStatus } from '@remote-orchestrator/shared';
-import { AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { GitCompare, ChevronDown, ChevronRight } from 'lucide-react';
+import { Tooltip } from './primitives/index.js';
 
 interface SessionSidebarProps {
   sessions: SessionInfo[];
@@ -13,6 +14,8 @@ interface SessionSidebarProps {
   width?: number;
   /** Ids of sessions that have pending unseen output (shown as a red "!" badge) */
   unreadSessions?: Set<string>;
+  /** Called when the user clicks the "uncommitted changes" indicator next to a session. */
+  onOpenDiff?: (id: string) => void;
 }
 
 function getStatusDotColor(status: SessionStatus): string {
@@ -24,6 +27,23 @@ function getStatusDotColor(status: SessionStatus): string {
       return 'var(--color-status-idle)';
     default:
       return 'var(--color-status-exited)';
+  }
+}
+
+/**
+ * Soft tinted background for a session row, indicating its status at a glance.
+ * - idle: green (done, ready to read)
+ * - waiting: red (agent is asking for user permission / input)
+ * - anything else: no tint
+ */
+function getStatusRowBackground(status: SessionStatus): string | null {
+  switch (status) {
+    case 'idle':
+      return 'rgba(34, 197, 94, 0.15)';
+    case 'waiting':
+      return 'rgba(239, 68, 68, 0.15)';
+    default:
+      return null;
   }
 }
 
@@ -49,7 +69,7 @@ function writeCollapsedGroups(ids: Set<string>): void {
   }
 }
 
-export function SessionSidebar({ sessions, activeSessionId, onSelectSession, headerAction, className, width, unreadSessions }: SessionSidebarProps) {
+export function SessionSidebar({ sessions, activeSessionId, onSelectSession, headerAction, className, width, unreadSessions, onOpenDiff }: SessionSidebarProps) {
   const activeCount = sessions.filter((s) => s.status !== 'exited').length;
 
   const groups = useMemo(() => {
@@ -212,6 +232,9 @@ export function SessionSidebar({ sessions, activeSessionId, onSelectSession, hea
                 const isActive = s.id === activeSessionId;
                 const dotColor = getStatusDotColor(s.status);
                 const isUnread = !!unreadSessions?.has(s.id) && s.status === 'idle';
+                const statusBg = getStatusRowBackground(s.status);
+                const activeBg = 'rgba(59, 130, 246, 0.18)';
+                const baseBg = isActive ? activeBg : (statusBg ?? 'transparent');
                 return (
                   <button
                     key={s.id}
@@ -226,17 +249,17 @@ export function SessionSidebar({ sessions, activeSessionId, onSelectSession, hea
                       border: 'none',
                       borderLeft: isActive ? '2px solid var(--color-accent)' : '2px solid transparent',
                       borderRadius: 'var(--radius-sm)',
-                      background: isActive ? 'var(--color-surface-bright, var(--color-bg-surface))' : 'transparent',
+                      background: baseBg,
                       cursor: 'pointer',
                       textAlign: 'left',
                       transition: 'background var(--transition-fast)',
                       marginBottom: '2px',
                     }}
                     onMouseEnter={(e) => {
-                      if (!isActive) e.currentTarget.style.background = 'var(--color-bg-elevated)';
+                      if (!isActive && !statusBg) e.currentTarget.style.background = 'var(--color-bg-elevated)';
                     }}
                     onMouseLeave={(e) => {
-                      if (!isActive) e.currentTarget.style.background = 'transparent';
+                      if (!isActive && !statusBg) e.currentTarget.style.background = baseBg;
                     }}
                   >
                     <span
@@ -274,7 +297,29 @@ export function SessionSidebar({ sessions, activeSessionId, onSelectSession, hea
                           {s.name}
                         </span>
                         {s.hasGitChanges && (
-                          <AlertTriangle size={11} color="var(--color-status-waiting)" strokeWidth={2} style={{ flexShrink: 0 }} />
+                          <Tooltip content="Uncommitted changes" position="bottom">
+                            <span
+                              role={onOpenDiff ? 'button' : undefined}
+                              tabIndex={onOpenDiff ? 0 : undefined}
+                              aria-label={onOpenDiff ? 'Uncommitted changes — open Git Diff' : 'uncommitted changes'}
+                              onClick={onOpenDiff ? (e) => { e.stopPropagation(); onOpenDiff(s.id); } : undefined}
+                              onKeyDown={onOpenDiff ? (e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  onOpenDiff(s.id);
+                                }
+                              } : undefined}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                flexShrink: 0,
+                                cursor: onOpenDiff ? 'pointer' : undefined,
+                              }}
+                            >
+                              <GitCompare size={11} color="var(--color-status-waiting)" strokeWidth={2} />
+                            </span>
+                          </Tooltip>
                         )}
                       </div>
                     </div>

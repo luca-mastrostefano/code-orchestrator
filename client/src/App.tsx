@@ -24,8 +24,18 @@ import type { TreeNode } from './components/ExplorerFolderTree.js';
 import type { AppTab } from './components/NavTabs.js';
 import { MobileBottomNav } from './components/MobileBottomNav.js';
 import { SidebarSettingsMenu } from './components/SidebarSettingsMenu.js';
+import {
+  loadFocusedSessionId,
+  saveFocusedSessionId,
+  loadActiveTab,
+  saveActiveTab,
+  loadDiffStates,
+  saveDiffStates,
+  loadExplorerStates,
+  saveExplorerStates,
+} from './utils/uiPersistence.js';
 import { api, setToken } from './services/api.js';
-import { WifiOff, Settings, Maximize2, Minimize2, Globe, ArrowUpCircle, Sun, Moon, Loader2, Terminal, GitBranch, FolderOpen } from 'lucide-react';
+import { WifiOff, Settings, Maximize2, Minimize2, Globe, ArrowUpCircle, Sun, Moon, Loader2, Terminal, GitCompare, FolderOpen } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { useResizablePanel } from './hooks/useResizablePanel.js';
 import { ResizeDivider } from './components/ResizeDivider.js';
@@ -123,17 +133,17 @@ function AppInner() {
   const { theme, isDark, toggle: toggleTheme } = useTheme();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [pickedFolder, setPickedFolder] = useState<string | null>(null);
-  const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null);
+  const [focusedSessionId, setFocusedSessionId] = useState<string | null>(() => loadFocusedSessionId());
   const [explorerState, setExplorerState] = useState<{ selectedFilePath: string | null; searchQuery: string }>({ selectedFilePath: null, searchQuery: '' });
-  const [diffStates, setDiffStates] = useState<Map<string, DiffState>>(new Map());
-  const [explorerStates, setExplorerStates] = useState<Map<string, DiffState>>(new Map());
+  const [diffStates, setDiffStates] = useState<Map<string, DiffState>>(() => loadDiffStates());
+  const [explorerStates, setExplorerStates] = useState<Map<string, DiffState>>(() => loadExplorerStates());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showNgrokModal, setShowNgrokModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [cloneModalState, setCloneModalState] = useState<{ folderPath: string; agentType?: string } | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [pendingRestartId, setPendingRestartId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<AppTab>('sessions');
+  const [activeTab, setActiveTab] = useState<AppTab>(() => loadActiveTab());
   const socket = useSocket();
   const socketConnected = useSocketStatus();
   const { sessions, createSession, deleteSession } = useSessions(socket);
@@ -346,7 +356,7 @@ function AppInner() {
 
   const handleCreate = async (folderPath: string, name?: string, agentType?: string, flags?: string[]) => {
     const session = await createSession(folderPath, name, agentType, flags);
-    if (isMobile) setFocusedSessionId(session.id);
+    handleFocus(session.id);
   };
 
   const handleClone = useCallback((folderPath: string, agentType?: string) => {
@@ -355,7 +365,7 @@ function AppInner() {
 
   const handleCloneConfirm = async (folderPath: string, agentType: string, flags?: string[]) => {
     const session = await createSession(folderPath, undefined, agentType, flags);
-    if (isMobile) setFocusedSessionId(session.id);
+    handleFocus(session.id);
   };
 
   const handleSaveFlag = useCallback(async (agentId: string, flag: import('@remote-orchestrator/shared').AgentFlag) => {
@@ -474,7 +484,9 @@ function AppInner() {
 
   useNotifications({
     sessions,
-    enabled: config?.notificationsEnabled ?? false,
+    notificationsEnabled: config?.notificationsEnabled ?? false,
+    soundEnabled: config?.soundEnabled ?? true,
+    focusedSessionId,
     onFocusSession: handleFocus,
     onSwitchToSessionsTab: handleSwitchToSessionsTab,
   });
@@ -569,6 +581,35 @@ function AppInner() {
     }
   }, [sessions]);
 
+  // Persist UI state so a page refresh returns the user to where they were.
+  useEffect(() => { saveFocusedSessionId(focusedSessionId); }, [focusedSessionId]);
+  useEffect(() => { saveActiveTab(activeTab); }, [activeTab]);
+  useEffect(() => { saveDiffStates(diffStates); }, [diffStates]);
+  useEffect(() => { saveExplorerStates(explorerStates); }, [explorerStates]);
+
+  // Once the session list loads, prune any persisted ids that no longer exist
+  // (session was deleted while the tab was closed). Only runs when there's at
+  // least one live session, so we don't wipe state on transient empty snapshots.
+  const persistedPrunedRef = useRef(false);
+  useEffect(() => {
+    if (persistedPrunedRef.current || sessions.length === 0) return;
+    persistedPrunedRef.current = true;
+    const liveIds = new Set(sessions.map((s) => s.id));
+    if (focusedSessionId && !liveIds.has(focusedSessionId)) {
+      setFocusedSessionId(null);
+    }
+    setDiffStates((prev) => {
+      const next = new Map<string, DiffState>();
+      for (const [id, v] of prev) if (liveIds.has(id)) next.set(id, v);
+      return next.size === prev.size ? prev : next;
+    });
+    setExplorerStates((prev) => {
+      const next = new Map<string, DiffState>();
+      for (const [id, v] of prev) if (liveIds.has(id)) next.set(id, v);
+      return next.size === prev.size ? prev : next;
+    });
+  }, [sessions, focusedSessionId]);
+
   const ngrokBorderColor = ngrok.status?.tunnelStatus === 'connected'
     ? 'var(--color-success)'
     : 'var(--color-border-subtle)';
@@ -634,7 +675,7 @@ function AppInner() {
         {/* Inline tabs */}
         {([
           { id: 'sessions' as AppTab, label: 'Terminal Sessions', icon: Terminal },
-          { id: 'git-diff' as AppTab, label: 'Git Diff', icon: GitBranch },
+          { id: 'git-diff' as AppTab, label: 'Git Diff', icon: GitCompare },
           { id: 'explorer' as AppTab, label: 'Explorer', icon: FolderOpen },
         ]).map((tab) => {
           const isActive = activeTab === tab.id;

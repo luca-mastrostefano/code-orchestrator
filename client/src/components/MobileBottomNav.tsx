@@ -1,4 +1,4 @@
-import { Terminal, GitBranch, FolderOpen, Plus, Settings } from 'lucide-react';
+import { Terminal, GitCompare, FolderOpen, Plus, Settings } from 'lucide-react';
 import type { AppTab } from './NavTabs.js';
 
 interface MobileBottomNavProps {
@@ -16,7 +16,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'sessions',  label: 'Sessions',  icon: Terminal },
-  { id: 'git-diff',  label: 'Git Diff',  icon: GitBranch },
+  { id: 'git-diff',  label: 'Git Diff',  icon: GitCompare },
   { id: 'explorer',  label: 'Explorer',  icon: FolderOpen },
 ];
 

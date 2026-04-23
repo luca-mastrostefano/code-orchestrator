@@ -62,6 +62,19 @@ export const api = {
     return res.json();
   },
 
+  renameSession: async (id: string, name: string): Promise<SessionInfo> => {
+    const res = await authFetch(`${API_BASE}/sessions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error || 'Failed to rename session');
+    }
+    return res.json();
+  },
+
   getPathCompletions: async (path: string): Promise<string[]> => {
     const res = await authFetch(`${API_BASE}/fs/autocomplete?path=${encodeURIComponent(path)}`);
     const data: PathCompletionResponse = await res.json();

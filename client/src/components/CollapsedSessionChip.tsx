@@ -1,14 +1,15 @@
 import type { SessionInfo } from '@remote-orchestrator/shared';
 import { StatusDot, Badge, Tooltip } from './primitives/index.js';
-import { AlertTriangle } from 'lucide-react';
+import { GitCompare } from 'lucide-react';
 import { STATUS_COLORS } from '../constants/status.js';
 
 interface CollapsedSessionChipProps {
   session: SessionInfo;
   onUncollapse: (id: string) => void;
+  onOpenDiff?: (id: string) => void;
 }
 
-export function CollapsedSessionChip({ session, onUncollapse }: CollapsedSessionChipProps) {
+export function CollapsedSessionChip({ session, onUncollapse, onOpenDiff }: CollapsedSessionChipProps) {
   const statusColor = STATUS_COLORS[session.status] ?? STATUS_COLORS.idle;
 
   return (
@@ -60,7 +61,29 @@ export function CollapsedSessionChip({ session, onUncollapse }: CollapsedSession
           {session.name}
         </span>
         {session.hasGitChanges && (
-          <AlertTriangle size={12} color="var(--color-status-waiting)" strokeWidth={2} style={{ flexShrink: 0 }} />
+          <Tooltip content="Uncommitted changes" position="bottom">
+            <span
+              role={onOpenDiff ? 'button' : undefined}
+              tabIndex={onOpenDiff ? 0 : undefined}
+              aria-label={onOpenDiff ? 'Uncommitted changes — open Git Diff' : 'uncommitted changes'}
+              onClick={onOpenDiff ? (e) => { e.stopPropagation(); onOpenDiff(session.id); } : undefined}
+              onKeyDown={onOpenDiff ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenDiff(session.id);
+                }
+              } : undefined}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                flexShrink: 0,
+                cursor: onOpenDiff ? 'pointer' : undefined,
+              }}
+            >
+              <GitCompare size={12} color="var(--color-status-waiting)" strokeWidth={2} />
+            </span>
+          </Tooltip>
         )}
         <Badge label={session.agentType} />
       </button>
